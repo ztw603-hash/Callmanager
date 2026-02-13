@@ -1,0 +1,352 @@
+/* ---------- Базовые стили ---------- */
+body {
+    background-color: #f5f5f5;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.navbar {
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.tab-pane {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.05);
+}
+
+/* ---------- Таблица звонков ---------- */
+.table-calls td {
+    vertical-align: middle;
+}
+
+.call-type-nedozvon {
+    background-color: #fff4ce !important;
+}
+
+.call-type-perezvon {
+    background-color: #dff6dd !important;
+}
+
+.call-type-tracking {
+    background-color: #e0f2fe !important;
+}
+
+/* ---------- Календарь ---------- */
+.work-day {
+    background-color: #e7f3ff !important;
+}
+
+.rest-day {
+    background-color: #f8f8f8 !important;
+}
+
+.today {
+    background-color: #d4edda !important;
+    border: 2px solid #28a745 !important;
+}
+
+.selected-day {
+    border: 3px solid #0078d4 !important;
+    box-shadow: 0 0 0 2px rgba(0,120,212,0.2);
+}
+
+.calendar-cell {
+    min-height: 90px;
+    height: 100%;
+    width: 100%;
+    border: 1px solid #dee2e6;
+    background-color: white;
+    padding: 8px;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 4px;
+}
+
+.calendar-cell:hover {
+    background-color: #f0f7ff;
+    box-shadow: inset 0 0 0 1px #0078d4;
+}
+
+.day-number {
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+
+.task-indicator {
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    background: #28a745;
+    color: white;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    text-align: center;
+    line-height: 22px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.legend-color {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-right: 5px;
+    border-radius: 4px;
+    vertical-align: middle;
+}
+
+/* ---------- Уведомления ---------- */
+#notification-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 380px;
+    width: 100%;
+}
+
+.notification {
+    background-color: #2b5278;
+    color: white;
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    animation: slideIn 0.3s ease-out;
+    border-left: 4px solid #4fc3f7;
+}
+
+.notification-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.notification-icon {
+    font-size: 20px;
+}
+
+.notification-title {
+    font-weight: bold;
+    font-size: 16px;
+    flex: 1;
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 20px;
+    padding: 0;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.notification-close:hover {
+    opacity: 1;
+}
+
+.notification-body {
+    margin-bottom: 12px;
+    line-height: 1.5;
+}
+
+.notification-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.notification-actions .btn {
+    font-size: 12px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+.notification.fade-out {
+    animation: fadeOut 0.3s ease-out forwards;
+}
+
+/* ---------- ТЁМНАЯ ТЕМА ---------- */
+body.dark-theme {
+    background-color: #1a1e24;
+    color: #e9ecef;
+}
+
+body.dark-theme .navbar {
+    background-color: #0b3b5c !important;
+}
+
+body.dark-theme .card,
+body.dark-theme .tab-pane,
+body.dark-theme .modal-content,
+body.dark-theme .dropdown-menu {
+    background-color: #2c2f33;
+    color: #e9ecef;
+    border-color: #444;
+}
+
+body.dark-theme .table {
+    color: #e9ecef;
+}
+
+body.dark-theme .table thead th {
+    background-color: #343a40;
+    color: #e9ecef;
+    border-color: #555;
+}
+
+body.dark-theme .table td,
+body.dark-theme .table th {
+    border-color: #555;
+}
+
+body.dark-theme .table-striped tbody tr:nth-of-type(odd) {
+    background-color: #2f353b;
+}
+
+body.dark-theme .table-hover tbody tr:hover {
+    background-color: #3a4047;
+}
+
+body.dark-theme .form-control,
+body.dark-theme .form-select,
+body.dark-theme .input-group-text {
+    background-color: #3a4047;
+    color: #e9ecef;
+    border-color: #555;
+}
+
+body.dark-theme .btn-outline-secondary {
+    color: #e9ecef;
+    border-color: #777;
+}
+
+body.dark-theme .bg-light {
+    background-color: #343a40 !important;
+}
+
+body.dark-theme .card-header.bg-info {
+    background-color: #1c6ea4 !important;
+}
+
+body.dark-theme .card-header.bg-warning {
+    background-color: #856404 !important;
+    color: #fff !important;
+}
+
+body.dark-theme .card-header.bg-danger {
+    background-color: #8b1e1e !important;
+}
+
+body.dark-theme .card-header.bg-dark {
+    background-color: #1b1e21 !important;
+}
+
+body.dark-theme .calendar-cell {
+    background-color: #2c2f33;
+    border-color: #555;
+    color: #e9ecef;
+}
+
+body.dark-theme .work-day {
+    background-color: #1e3a5f !important;
+}
+
+body.dark-theme .rest-day {
+    background-color: #2f353b !important;
+}
+
+body.dark-theme .today {
+    background-color: #28543c !important;
+    border-color: #3c9e5a !important;
+}
+
+body.dark-theme .selected-day {
+    border-color: #4c9be6 !important;
+}
+
+body.dark-theme .notification {
+    background-color: #1e3a5f;
+}
+
+/* ---------- Дополнительные улучшения ---------- */
+/* Скруглённые кнопки */
+.btn.rounded-3 {
+    border-radius: 0.5rem !important;
+}
+
+/* Отступы для группы кнопок */
+.d-flex.gap-2 {
+    gap: 0.5rem !important;
+}
+
+/* Адаптивность календаря */
+#calendarContainer {
+    background: white;
+    border-radius: 8px;
+    transition: background-color 0.3s ease;
+}
+
+body.dark-theme #calendarContainer {
+    background: #2c2f33;
+}
+
+/* Стили для задач */
+#tasksList .task-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 8px;
+    margin-bottom: 4px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    transition: background-color 0.3s ease;
+}
+
+body.dark-theme #tasksList .task-item {
+    background-color: #3a4047;
+    color: #e9ecef;
+}
+
+.task-item.completed .task-text {
+    text-decoration: line-through;
+    color: #6c757d;
+}
+
+body.dark-theme .task-item.completed .task-text {
+    color: #adb5bd;
+}
+/* Улучшение для уведомлений - кнопки с указателем */
+.notification-actions .btn {
+    cursor: pointer;
+}
