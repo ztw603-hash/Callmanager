@@ -1,0 +1,317 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Управление справочником{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>⚙️ Управление справочником</h2>
+        <button class="btn btn-primary" id="addTopicBtn">➕ Добавить тему</button>
+    </div>
+
+    <div id="topics-list">
+        {% for topic in topics %}
+        <div class="card mb-3" data-topic-id="{{ topic.id }}">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>{{ topic.title }}</strong>
+                    <span class="badge {% if topic.is_active %}bg-success{% else %}bg-secondary{% endif %} ms-2">
+                        {% if topic.is_active %}Активна{% else %}Неактивна{% endif %}
+                    </span>
+                    <span class="badge bg-info ms-2">Порядок: {{ topic.order }}</span>
+                </div>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary edit-topic-btn"
+                            data-topic-id="{{ topic.id }}"
+                            data-topic-title="{{ topic.title|escapejs }}"
+                            data-topic-order="{{ topic.order }}"
+                            data-topic-active="{{ topic.is_active|lower }}"
+                            title="Редактировать тему">✏️</button>
+                    <button class="btn btn-sm btn-outline-danger delete-topic-btn"
+                            data-topic-id="{{ topic.id }}"
+                            title="Удалить тему">🗑️</button>
+                    <button class="btn btn-sm btn-outline-success add-tab-btn"
+                            data-topic-id="{{ topic.id }}"
+                            title="Добавить вкладку">➕ Вкладка</button>
+                </div>
+            </div>
+            <div class="card-body">
+                {% with tabs=topic.tabs.all %}
+                    {% if tabs %}
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Название</th>
+                                    <th>Содержимое</th>
+                                    <th>Порядок</th>
+                                    <th>Статус</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tab in tabs %}
+                                <tr data-tab-id="{{ tab.id }}">
+                                    <td>{{ tab.title }}</td>
+                                    <td>{{ tab.content|truncatechars:50 }}</td>
+                                    <td>{{ tab.order }}</td>
+                                    <td>
+                                        <span class="badge {% if tab.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                                            {{ tab.is_active|yesno:"Активна,Неактивна" }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary edit-tab-btn"
+                                                data-tab-id="{{ tab.id }}"
+                                                data-tab-title="{{ tab.title|escapejs }}"
+                                                data-tab-content="{{ tab.content|escapejs }}"
+                                                data-tab-order="{{ tab.order }}"
+                                                data-tab-active="{{ tab.is_active|lower }}"
+                                                title="Редактировать вкладку">✏️</button>
+                                        <button class="btn btn-sm btn-outline-danger delete-tab-btn"
+                                                data-tab-id="{{ tab.id }}"
+                                                title="Удалить вкладку">🗑️</button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <p class="text-muted">Нет вкладок</p>
+                    {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Модальное окно для темы -->
+<div class="modal fade" id="topicModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="topicModalTitle">➕ Добавить тему</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="topicForm">
+                    <input type="hidden" id="topicId">
+                    <div class="mb-3">
+                        <label for="topicTitle" class="form-label fw-bold">Название темы</label>
+                        <input type="text" class="form-control" id="topicTitle" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="topicOrder" class="form-label fw-bold">Порядок</label>
+                        <input type="number" class="form-control" id="topicOrder" value="0">
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="topicActive" checked>
+                            <label class="form-check-label" for="topicActive">Активна</label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="saveTopicBtn">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для вкладки -->
+<div class="modal fade" id="tabModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="tabModalTitle">➕ Добавить вкладку</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="tabForm">
+                    <input type="hidden" id="tabId">
+                    <input type="hidden" id="tabTopicId">
+                    <div class="mb-3">
+                        <label for="tabTitle" class="form-label fw-bold">Название вкладки</label>
+                        <input type="text" class="form-control" id="tabTitle" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="tabContent" class="form-label fw-bold">Содержимое</label>
+                        <textarea class="form-control" id="tabContent" rows="6" required></textarea>
+                        <small class="text-muted">Можно использовать обычный текст, переносы строк сохраняются.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="tabOrder" class="form-label fw-bold">Порядок</label>
+                        <input type="number" class="form-control" id="tabOrder" value="0">
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="tabActive" checked>
+                            <label class="form-check-label" for="tabActive">Активна</label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-success" id="saveTabBtn">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    'use strict';
+
+    const csrftoken = '{{ csrf_token }}';
+
+    // ---------- ОТКРЫТИЕ МОДАЛОК ----------
+    function openModal(modalId) {
+        new bootstrap.Modal(document.getElementById(modalId)).show();
+    }
+
+    // ---------- ТЕМЫ ----------
+    document.getElementById('addTopicBtn')?.addEventListener('click', function() {
+        document.getElementById('topicModalTitle').innerText = '➕ Добавить тему';
+        document.getElementById('topicId').value = '';
+        document.getElementById('topicTitle').value = '';
+        document.getElementById('topicOrder').value = '0';
+        document.getElementById('topicActive').checked = true;
+        openModal('topicModal');
+    });
+
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.edit-topic-btn');
+        if (!btn) return;
+        const id = btn.dataset.topicId;
+        const title = btn.dataset.topicTitle;
+        const order = btn.dataset.topicOrder;
+        const active = btn.dataset.topicActive === 'true';
+        document.getElementById('topicModalTitle').innerText = '✏️ Редактировать тему';
+        document.getElementById('topicId').value = id;
+        document.getElementById('topicTitle').value = title;
+        document.getElementById('topicOrder').value = order;
+        document.getElementById('topicActive').checked = active;
+        openModal('topicModal');
+    });
+
+    document.getElementById('saveTopicBtn')?.addEventListener('click', function() {
+        const id = document.getElementById('topicId').value;
+        const title = document.getElementById('topicTitle').value.trim();
+        const order = document.getElementById('topicOrder').value;
+        const active = document.getElementById('topicActive').checked;
+        if (!title) {
+            alert('Введите название темы');
+            return;
+        }
+        const url = id ? '/help-admin/edit_topic/' : '/help-admin/add_topic/';
+        const data = id ? {id, title, order, is_active: active} : {title};
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.ok ? location.reload() : response.text().then(text => { throw new Error(text); }))
+        .catch(error => alert('Ошибка: ' + error.message));
+    });
+
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.delete-topic-btn');
+        if (!btn || !confirm('Удалить тему? Все вкладки также будут удалены.')) return;
+        const id = btn.dataset.topicId;
+        fetch('/help-admin/delete_topic/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken
+            },
+            body: JSON.stringify({id})
+        })
+        .then(response => response.ok ? location.reload() : response.text().then(text => { throw new Error(text); }))
+        .catch(error => alert('Ошибка: ' + error.message));
+    });
+
+    // ---------- ВКЛАДКИ ----------
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.add-tab-btn');
+        if (!btn) return;
+        const topicId = btn.dataset.topicId;
+        document.getElementById('tabModalTitle').innerText = '➕ Добавить вкладку';
+        document.getElementById('tabId').value = '';
+        document.getElementById('tabTopicId').value = topicId;
+        document.getElementById('tabTitle').value = '';
+        document.getElementById('tabContent').value = '';
+        document.getElementById('tabOrder').value = '0';
+        document.getElementById('tabActive').checked = true;
+        openModal('tabModal');
+    });
+
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.edit-tab-btn');
+        if (!btn) return;
+        const id = btn.dataset.tabId;
+        const title = btn.dataset.tabTitle;
+        const content = btn.dataset.tabContent;
+        const order = btn.dataset.tabOrder;
+        const active = btn.dataset.tabActive === 'true';
+        document.getElementById('tabModalTitle').innerText = '✏️ Редактировать вкладку';
+        document.getElementById('tabId').value = id;
+        document.getElementById('tabTopicId').value = '';
+        document.getElementById('tabTitle').value = title;
+        document.getElementById('tabContent').value = content;
+        document.getElementById('tabOrder').value = order;
+        document.getElementById('tabActive').checked = active;
+        openModal('tabModal');
+    });
+
+    document.getElementById('saveTabBtn')?.addEventListener('click', function() {
+        const id = document.getElementById('tabId').value;
+        const topicId = document.getElementById('tabTopicId').value;
+        const title = document.getElementById('tabTitle').value.trim();
+        const content = document.getElementById('tabContent').value.trim();
+        const order = document.getElementById('tabOrder').value;
+        const active = document.getElementById('tabActive').checked;
+        if (!title || !content) {
+            alert('Заполните название и содержимое');
+            return;
+        }
+        const url = id ? '/help-admin/edit_tab/' : '/help-admin/add_tab/';
+        const data = id ?
+            {id, title, content, order, is_active: active} :
+            {topic_id: topicId, title, content};
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.ok ? location.reload() : response.text().then(text => { throw new Error(text); }))
+        .catch(error => alert('Ошибка: ' + error.message));
+    });
+
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.delete-tab-btn');
+        if (!btn || !confirm('Удалить вкладку?')) return;
+        const id = btn.dataset.tabId;
+        fetch('/help-admin/delete_tab/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken
+            },
+            body: JSON.stringify({id})
+        })
+        .then(response => response.ok ? location.reload() : response.text().then(text => { throw new Error(text); }))
+        .catch(error => alert('Ошибка: ' + error.message));
+    });
+})();
+</script>
+{% endblock %}

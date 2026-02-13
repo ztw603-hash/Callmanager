@@ -1,0 +1,374 @@
+{% load static %}
+<div class="tab-pane active">
+    <h2 class="mb-4">📅 Календарь рабочего графика и задачи</h2>
+
+    <!-- Управление месяцем -->
+    <div class="row mb-3 align-items-center">
+        <div class="col-md-6">
+            <div class="btn-group">
+                <button class="btn btn-outline-primary" onclick="prevMonth()">◀ Пред.</button>
+                <button class="btn btn-outline-primary" onclick="todayMonth()">Сегодня</button>
+                <button class="btn btn-outline-primary" onclick="nextMonth()">След. ▶</button>
+            </div>
+            <span class="ms-3 h5" id="monthYearDisplay"></span>
+        </div>
+        <div class="col-md-6 text-end">
+            <span id="workStats" class="badge bg-info fs-6">Рабочих: 0, Выходных: 0</span>
+        </div>
+    </div>
+
+    <!-- Легенда -->
+    <div class="row mb-3">
+        <div class="col-12 d-flex flex-wrap gap-3">
+            <span><span class="legend-color" style="background:#e7f3ff;"></span> Рабочий день</span>
+            <span><span class="legend-color" style="background:#f8f8f8;"></span> Выходной</span>
+            <span><span class="legend-color" style="background:#d4edda;"></span> Сегодня</span>
+            <span><span class="legend-color" style="border:2px solid #0078d4; background:white;"></span> Выбранный</span>
+            <span><span class="legend-color" style="background:#28a745;"></span> Есть задачи</span>
+        </div>
+    </div>
+
+    <!-- Календарная сетка -->
+    <div class="row">
+        <div class="col-md-8">
+            <div id="calendarContainer" class="border rounded p-3 bg-white" style="min-width: 100%; overflow-x: auto;">
+                <!-- Дни недели -->
+                <div class="row g-0 text-center fw-bold bg-light rounded-top">
+                    <div class="col">Пн</div>
+                    <div class="col">Вт</div>
+                    <div class="col">Ср</div>
+                    <div class="col">Чт</div>
+                    <div class="col">Пт</div>
+                    <div class="col bg-secondary bg-opacity-10">Сб</div>
+                    <div class="col bg-secondary bg-opacity-10">Вс</div>
+                </div>
+                <div id="calendarDays" class="row g-0"></div>
+            </div>
+        </div>
+
+        <!-- Задачи на выбранный день — поле ввода сверху -->
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header bg-primary text-white">
+                    <i class="bi bi-check2-square"></i> Задачи на день: <span id="selectedDateLabel">--.--.----</span>
+                </div>
+                <div class="card-body">
+                    <!-- Поле ввода новой задачи -->
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" id="newTaskInput" placeholder="Новая задача">
+                        <button class="btn btn-success" onclick="addTask()">➕</button>
+                    </div>
+                    <!-- Список задач -->
+                    <div id="tasksList" style="min-height: 200px; max-height: 300px; overflow-y: auto;">
+                        <!-- Список задач -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* ---------- Стили для календаря ---------- */
+.calendar-cell {
+    min-height: 90px;
+    height: 100%;
+    width: 100%;
+    border: 1px solid #dee2e6;
+    background-color: white;
+    padding: 8px;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 4px;
+}
+.calendar-cell:hover {
+    background-color: #f0f7ff;
+    box-shadow: inset 0 0 0 1px #0078d4;
+}
+.day-number {
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+.work-day {
+    background-color: #e7f3ff !important;
+}
+.rest-day {
+    background-color: #f8f8f8 !important;
+}
+.today {
+    background-color: #d4edda !important;
+    border: 2px solid #28a745 !important;
+}
+.selected-day {
+    border: 3px solid #0078d4 !important;
+    box-shadow: 0 0 0 2px rgba(0,120,212,0.2);
+}
+.task-indicator {
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    background: #28a745;
+    color: white;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    text-align: center;
+    line-height: 22px;
+    font-size: 12px;
+    font-weight: bold;
+}
+.legend-color {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-right: 5px;
+    border-radius: 4px;
+    vertical-align: middle;
+}
+#calendarContainer {
+    background: white;
+    border-radius: 8px;
+}
+#calendarDays .col {
+    padding: 2px;
+}
+#tasksList .task-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 8px;
+    margin-bottom: 4px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+}
+.task-item.completed .task-text {
+    text-decoration: line-through;
+    color: #6c757d;
+}
+</style>
+
+<script>
+var currentYear, currentMonth;
+var selectedDate = null;
+var workSchedule = {};
+var tasksData = {};
+
+window.init_schedule = function() {
+    var today = new Date();
+    currentYear = today.getFullYear();
+    currentMonth = today.getMonth() + 1;
+    loadSchedule(currentYear, currentMonth);
+};
+
+// Загрузка данных календаря с сервера
+function loadSchedule(year, month) {
+    $.get('/api/schedule/', {year: year, month: month}, function(data) {
+        workSchedule = data.work_schedule;
+        tasksData = data.tasks;
+        renderCalendar(year, month);
+        updateMonthDisplay(year, month);
+        updateWorkStats();
+        // Если выбранная дата есть, обновляем её задачи
+        if (selectedDate) {
+            loadTasksForDate(selectedDate);
+        }
+    });
+}
+
+// Отрисовка календаря (без запроса к серверу, использует текущие workSchedule и tasksData)
+function renderCalendar(year, month) {
+    var firstDay = new Date(year, month-1, 1);
+    var startDayOfWeek = firstDay.getDay();
+    startDayOfWeek = (startDayOfWeek === 0) ? 6 : startDayOfWeek - 1;
+    
+    var daysInMonth = new Date(year, month, 0).getDate();
+    
+    var html = '';
+    var dayCounter = 1;
+    var today = new Date();
+    var isTodayYear = today.getFullYear() === year;
+    var isTodayMonth = today.getMonth()+1 === month;
+    var todayDate = today.getDate();
+    
+    for (var r = 0; r < 6; r++) {
+        html += '<div class="row g-0">';
+        for (var c = 0; c < 7; c++) {
+            if (r === 0 && c < startDayOfWeek) {
+                html += '<div class="col p-1" style="min-width: 0;"></div>';
+            } else if (dayCounter <= daysInMonth) {
+                var day = dayCounter;
+                var dateKey = year + '-' + String(month).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+                var isWorkDay = workSchedule[day] === true;
+                var isToday = isTodayYear && isTodayMonth && day === todayDate;
+                var isSelected = selectedDate === dateKey;
+                var hasTasks = tasksData[day] && tasksData[day].length > 0;
+                
+                var classes = 'calendar-cell';
+                if (isWorkDay) classes += ' work-day';
+                if (isToday) classes += ' today';
+                
+                html += '<div class="col p-1">';
+                html += '<div class="' + classes + '" data-date="' + dateKey + '" onclick="selectDate(\'' + dateKey + '\')" style="' + (isSelected ? 'border:3px solid #0078d4;' : '') + '">';
+                html += '<span class="day-number">' + day + '</span>';
+                if (hasTasks) {
+                    html += '<span class="task-indicator">' + tasksData[day].length + '</span>';
+                }
+                html += '</div>';
+                html += '</div>';
+                dayCounter++;
+            } else {
+                html += '<div class="col p-1" style="min-width: 0;"></div>';
+            }
+        }
+        html += '</div>';
+        if (dayCounter > daysInMonth) break;
+    }
+    $('#calendarDays').html(html);
+}
+
+function updateMonthDisplay(year, month) {
+    var monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+                     'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+    $('#monthYearDisplay').text(monthNames[month-1] + ' ' + year);
+}
+
+function updateWorkStats() {
+    var workCount = 0, restCount = 0;
+    for (var d in workSchedule) {
+        if (workSchedule[d]) workCount++;
+        else restCount++;
+    }
+    $('#workStats').text('Рабочих: ' + workCount + ', Выходных: ' + restCount);
+}
+
+function prevMonth() {
+    if (currentMonth === 1) {
+        currentYear--;
+        currentMonth = 12;
+    } else {
+        currentMonth--;
+    }
+    loadSchedule(currentYear, currentMonth);
+}
+
+function nextMonth() {
+    if (currentMonth === 12) {
+        currentYear++;
+        currentMonth = 1;
+    } else {
+        currentMonth++;
+    }
+    loadSchedule(currentYear, currentMonth);
+}
+
+function todayMonth() {
+    var today = new Date();
+    currentYear = today.getFullYear();
+    currentMonth = today.getMonth() + 1;
+    loadSchedule(currentYear, currentMonth);
+}
+
+function selectDate(dateStr) {
+    selectedDate = dateStr;
+    $('#selectedDateLabel').text(dateStr.replace(/-/g, '.'));
+    $('.calendar-cell').removeClass('selected-day').css('border', '');
+    $('.calendar-cell[data-date="' + dateStr + '"]').addClass('selected-day');
+    loadTasksForDate(dateStr);
+}
+
+function loadTasksForDate(dateStr) {
+    var day = parseInt(dateStr.split('-')[2]);
+    var tasks = tasksData[day] || [];
+    var html = '';
+    if (tasks.length === 0) {
+        html = '<p class="text-muted text-center">Нет задач на этот день</p>';
+    } else {
+        tasks.forEach(function(t) {
+            html += '<div class="task-item ' + (t.completed ? 'completed' : '') + '">';
+            html += '<div class="form-check">';
+            html += '<input class="form-check-input" type="checkbox" id="task' + t.id + '" ' + (t.completed ? 'checked' : '') + ' onchange="toggleTask(' + t.id + ')">';
+            html += '<label class="form-check-label task-text" for="task' + t.id + '">' + escapeHtml(t.task) + '</label>';
+            html += '</div>';
+            html += '<button class="btn btn-sm btn-danger" onclick="deleteTask(' + t.id + ')">×</button>';
+            html += '</div>';
+        });
+    }
+    $('#tasksList').html(html);
+}
+
+// ========== ИСПРАВЛЕННОЕ УДАЛЕНИЕ ЗАДАЧИ ==========
+function deleteTask(taskId) {
+    if (confirm('Удалить задачу?')) {
+        $.post('/api/tasks/delete/', {id: taskId})
+            .done(function() {
+                // Удаляем задачу из локального объекта tasksData
+                for (let day in tasksData) {
+                    tasksData[day] = tasksData[day].filter(t => t.id !== taskId);
+                    if (tasksData[day].length === 0) {
+                        delete tasksData[day];
+                    }
+                }
+                // Перерисовываем календарь и список задач без нового запроса
+                renderCalendar(currentYear, currentMonth);
+                if (selectedDate) {
+                    loadTasksForDate(selectedDate);
+                }
+            });
+    }
+}
+
+// ========== ПЕРЕКЛЮЧЕНИЕ СТАТУСА ЗАДАЧИ ==========
+function toggleTask(taskId) {
+    $.post('/api/tasks/toggle/', {id: taskId})
+        .done(function(data) {
+            // Обновляем статус в локальных данных
+            for (let day in tasksData) {
+                tasksData[day] = tasksData[day].map(t => 
+                    t.id === taskId ? {...t, completed: data.completed} : t
+                );
+            }
+            // Обновляем отображение
+            renderCalendar(currentYear, currentMonth);
+            if (selectedDate) {
+                loadTasksForDate(selectedDate);
+            }
+        });
+}
+
+// ========== ДОБАВЛЕНИЕ ЗАДАЧИ ==========
+function addTask() {
+    if (!selectedDate) {
+        alert('Сначала выберите дату в календаре');
+        return;
+    }
+    var taskText = $('#newTaskInput').val().trim();
+    if (!taskText) return;
+    $.post('/api/tasks/add/', {date: selectedDate, task: taskText})
+        .done(function(res) {
+            $('#newTaskInput').val('');
+            // Добавляем новую задачу в локальные данные
+            var day = parseInt(selectedDate.split('-')[2]);
+            if (!tasksData[day]) tasksData[day] = [];
+            tasksData[day].push({
+                id: res.id,
+                task: res.task,
+                completed: res.completed
+            });
+            // Обновляем отображение
+            renderCalendar(currentYear, currentMonth);
+            loadTasksForDate(selectedDate);
+        });
+}
+
+function escapeHtml(text) {
+    var map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+}
+</script>

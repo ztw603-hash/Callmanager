@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+{% block title %}Админ-панель{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header bg-warning">
+        <h3>Управление пользователями</h3>
+    </div>
+    <div class="card-body">
+        <div class="mb-3">
+            <button class="btn btn-success" id="openAddUserModalBtn">➕ Добавить пользователя</button>
+        </div>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Логин</th>
+                    <th>Имя</th>
+                    <th>Staff</th>
+                    <th>Активен</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td>{{ u.id }}</td>
+                    <td>{{ u.username }}</td>
+                    <td>{{ u.first_name }}</td>
+                    <td>{% if u.is_staff %}✅{% endif %}</td>
+                    <td>{% if u.is_active %}✅{% endif %}</td>
+                    <td>
+                        {% if u.id != user.id %}
+                        <button class="btn btn-danger btn-sm delete-user-btn"
+                                data-user-id="{{ u.id }}">
+                            Удалить
+                        </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Модальное окно добавления пользователя -->
+<div class="modal fade" id="addUserModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">➕ Новый пользователь</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addUserForm">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="username" class="form-label fw-bold">Логин</label>
+                        <input type="text" name="username" id="username" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label fw-bold">Пароль</label>
+                        <input type="password" name="password" id="password" class="form-control" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-success" id="saveUserBtn">Добавить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    'use strict';
+
+    // ---------- Открытие модального окна добавления пользователя ----------
+    document.getElementById('openAddUserModalBtn')?.addEventListener('click', function() {
+        new bootstrap.Modal(document.getElementById('addUserModal')).show();
+    });
+
+    // ---------- Сохранение нового пользователя ----------
+    document.getElementById('saveUserBtn')?.addEventListener('click', function() {
+        const form = document.getElementById('addUserForm');
+        const formData = new FormData(form);
+        fetch('{% url "admin_add_user" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                return response.text().then(text => { throw new Error(text); });
+            }
+        })
+        .catch(error => alert('Ошибка: ' + error.message));
+    });
+
+    // ---------- Удаление пользователя (через делегирование) ----------
+    document.addEventListener('click', function(e) {
+        const deleteBtn = e.target.closest('.delete-user-btn');
+        if (!deleteBtn) return;
+
+        const userId = deleteBtn.dataset.userId;
+        if (confirm('Удалить пользователя?')) {
+            const formData = new FormData();
+            formData.append('user_id', userId);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+            fetch('{% url "admin_delete_user" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    return response.text().then(text => { throw new Error(text); });
+                }
+            })
+            .catch(error => alert('Ошибка: ' + error.message));
+        }
+    });
+})();
+</script>
+{% endblock %}

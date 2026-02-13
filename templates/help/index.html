@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Справочная информация{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-4">📚 Справочная информация</h2>
+
+    <div class="accordion" id="helpAccordion">
+        {% for topic in topics %}
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="heading{{ topic.id }}">
+                <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ topic.id }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="collapse{{ topic.id }}">
+                    <strong>{{ topic.title }}</strong>
+                </button>
+            </h2>
+            <div id="collapse{{ topic.id }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" aria-labelledby="heading{{ topic.id }}" data-bs-parent="#helpAccordion">
+                <div class="accordion-body">
+                    {% with tabs=topic.tabs.all %}
+                        {% if tabs %}
+                            <ul class="nav nav-tabs" id="tabList{{ topic.id }}" role="tablist">
+                                {% for tab in tabs %}
+                                    {% if tab.is_active %}
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link {% if forloop.first %}active{% endif %}" id="tab-{{ tab.id }}-btn" data-bs-toggle="tab" data-bs-target="#tab-{{ tab.id }}" type="button" role="tab">
+                                                {{ tab.title }}
+                                            </button>
+                                        </li>
+                                    {% endif %}
+                                {% endfor %}
+                            </ul>
+                            <div class="tab-content mt-3" id="tabContent{{ topic.id }}">
+                                {% for tab in tabs %}
+                                    {% if tab.is_active %}
+                                        <div class="tab-pane fade {% if forloop.first %}show active{% endif %}" id="tab-{{ tab.id }}" role="tabpanel">
+                                            {{ tab.content|linebreaks }}
+                                        </div>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="text-muted">Нет активных вкладок</p>
+                        {% endif %}
+                    {% endwith %}
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="alert alert-info">Справочная информация отсутствует.</div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

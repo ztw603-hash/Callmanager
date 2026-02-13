@@ -1,0 +1,677 @@
+{% load static %}
+<div class="tab-pane active">
+    <h2 class="mb-4">📋 Журнал звонков</h2>
+
+    <!-- Форма добавления записи -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <i class="bi bi-plus-circle"></i> Добавить звонок
+        </div>
+        <div class="card-body">
+            <form id="callForm">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label>Комментарий</label>
+                            <input type="text" class="form-control" id="callComment" placeholder="Например: Иванов Иван" required>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label>Телефон</label>
+                            <input type="text" class="form-control" id="callPhone" placeholder="8XXXXXXXXXX" required>
+                            <small class="form-text text-muted">Формат: 8XXXXXXXXXX (11 цифр)</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label>Тип</label>
+                            <select class="form-control" id="callTypeSelect">
+                                <option value="Недозвон">📞 Недозвон</option>
+                                <option value="Перезвон">⏰ Ручной перезвон</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="form-group">
+                            <label>Время перезвона</label>
+                            <input type="datetime-local" class="form-control" id="callNextAttempt" disabled>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">➕ Добавить</button>
+                        <button type="button" class="btn btn-secondary" onclick="clearCallForm()">Очистить</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Панель действий над таблицей -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-success rounded-3 px-3" onclick="addAttempt()">⏰ Добавить попытку</button>
+                <button class="btn btn-danger rounded-3 px-3" onclick="deleteSelected()">🗑 Удалить</button>
+                <button class="btn btn-info rounded-3 px-3" onclick="copyPhone()">📋 Копировать телефон</button>
+                <button class="btn btn-secondary rounded-3 px-3" onclick="copyComment()">📝 Копировать комментарий</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Фильтр по дате -->
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <div class="input-group">
+                <span class="input-group-text">📅 Фильтр по дате</span>
+                <select class="form-select" id="dateFilter">
+                    <option value="">Все записи</option>
+                </select>
+                <button class="btn btn-outline-secondary" type="button" onclick="resetDateFilter()">Сброс</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Статистика -->
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <div class="card bg-light">
+                <div class="card-body">
+                    <span id="totalLabel" class="badge bg-secondary me-3">Всего: 0</span>
+                    <span id="overdueLabel" class="badge bg-danger me-3">Просрочено: 0</span>
+                    <span id="nextLabel" class="badge bg-info">Следующий звонок: --:--</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Таблица звонков -->
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover table-calls" id="callsTable">
+            <thead class="table-light">
+                <tr>
+                    <th><input type="checkbox" id="selectAll"></th>
+                    <th>ID</th>
+                    <th>Комментарий</th>
+                    <th>Телефон</th>
+                    <th>Первая попытка</th>
+                    <th>Следующая попытка</th>
+                    <th>Попытка</th>
+                    <th>Время до звонка</th>
+                    <th>Статус</th>
+                    <th>Тип</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody id="callsTableBody">
+                <tr><td colspan="11" class="text-center">Загрузка...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Модальные окна -->
+<div class="modal fade" id="adjustTimeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">✏️ Изменение времени звонка</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="adjustTimeForm">
+                    <input type="hidden" id="adjustCallId">
+                    <div class="mb-3">
+                        <label for="adjustNextAttempt" class="form-label fw-bold">Новое время звонка</label>
+                        <input type="datetime-local" class="form-control" id="adjustNextAttempt" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="saveAdjustedTime()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editCommentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">✏️ Изменение комментария</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editCommentForm">
+                    <input type="hidden" id="editCommentCallId">
+                    <div class="mb-3">
+                        <label for="editCommentText" class="form-label fw-bold">Новый комментарий</label>
+                        <input type="text" class="form-control" id="editCommentText" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-info" onclick="saveComment()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editPhoneModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">📞 Изменение телефона</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editPhoneForm">
+                    <input type="hidden" id="editPhoneCallId">
+                    <div class="mb-3">
+                        <label for="editPhoneText" class="form-label fw-bold">Новый номер телефона</label>
+                        <input type="text" class="form-control" id="editPhoneText" placeholder="8XXXXXXXXXX" required>
+                        <div class="form-text text-muted">Формат: 8XXXXXXXXXX (11 цифр)</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-info" onclick="savePhone()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Инициализация вкладки
+window.init_calls = function() {
+    loadDateFilterOptions();
+    setupEventListeners();
+    startTimeUpdater();
+};
+
+let timeUpdateInterval = null;
+
+function startTimeUpdater() {
+    if (timeUpdateInterval) clearInterval(timeUpdateInterval);
+    timeUpdateInterval = setInterval(updateTimeUntil, 5000);
+}
+
+function updateTimeUntil() {
+    $('#callsTableBody tr').each(function() {
+        const row = $(this);
+        const nextAttemptCell = row.find('td:eq(5)');
+        if (nextAttemptCell.length) {
+            const nextAttemptText = nextAttemptCell.text();
+            let nextDate = new Date(nextAttemptText.replace(' ', 'T'));
+            let oldStatus = row.find('td:eq(8)').text().trim(); // текущий статус из ячейки
+            let timeUntil = calculateTimeUntil(nextDate);
+            let newStatus = calculateNotificationStatus(nextDate);
+            
+            row.find('td:eq(7)').text(timeUntil);
+            
+            // Если статус изменился и стал "Просрочено" – показываем уведомление локально
+            if (oldStatus !== newStatus && newStatus === 'Просрочено') {
+                // Извлекаем данные звонка из текущей строки
+                const callId = row.find('td:eq(1)').text(); // ID
+                const comment = row.find('td:eq(2)').text();
+                const phone = row.find('td:eq(3) span').text(); // номер из <span>
+                const nextAttempt = nextAttemptText;
+                
+                // Вызываем глобальную функцию показа уведомления
+                if (window.showNotification) {
+                    window.showNotification({
+                        id: callId,
+                        comment: comment,
+                        phone: phone,
+                        next_attempt: nextAttempt
+                    });
+                }
+            }
+            
+            // Обновляем бейдж статуса
+            let statusBadge = '';
+            if (newStatus === 'Просрочено') statusBadge = '<span class="badge bg-danger">Просрочено</span>';
+            else if (newStatus === 'Скоро') statusBadge = '<span class="badge bg-warning text-dark">Скоро</span>';
+            else if (newStatus === 'Близко') statusBadge = '<span class="badge bg-info">Близко</span>';
+            else statusBadge = '<span class="badge bg-secondary">Запланиран</span>';
+            row.find('td:eq(8)').html(statusBadge);
+        }
+    });
+    updateStatsFromTable();
+}
+
+function calculateTimeUntil(nextDate) {
+    const now = new Date();
+    if (nextDate <= now) return "Просрочено";
+    
+    const diffMs = nextDate - now;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    const diffSeconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+    
+    if (diffDays > 0) {
+        return `${diffDays}д ${diffHours}ч`;
+    } else if (diffHours > 0) {
+        return `${diffHours}ч ${diffMinutes}м`;
+    } else if (diffMinutes > 0) {
+        return `${diffMinutes}м ${diffSeconds}с`;
+    } else {
+        return `${diffSeconds}с`;
+    }
+}
+
+function calculateNotificationStatus(nextDate) {
+    const now = new Date();
+    const diffMs = nextDate - now;
+    const diffSeconds = Math.floor(diffMs / 1000);
+    
+    if (diffSeconds <= 0) return "Просрочено";
+    if (diffSeconds <= 300) return "Скоро";
+    if (diffSeconds <= 900) return "Близко";
+    return "Запланиран";
+}
+
+function updateStatsFromTable() {
+    const rows = $('#callsTableBody tr');
+    const total = rows.length;
+    let overdue = 0;
+    let nextCall = null;
+    let nextTime = null;
+    rows.each(function() {
+        const statusCell = $(this).find('td:eq(8)');
+        if (statusCell.text().includes('Просрочено')) overdue++;
+        const nextAttemptText = $(this).find('td:eq(5)').text();
+        if (nextAttemptText) {
+            const dt = new Date(nextAttemptText.replace(' ', 'T'));
+            if (dt > new Date()) {
+                if (!nextTime || dt < nextTime) {
+                    nextTime = dt;
+                    nextCall = nextAttemptText;
+                }
+            }
+        }
+    });
+    $('#totalLabel').text('Всего: ' + total);
+    $('#overdueLabel').text('Просрочено: ' + overdue);
+    $('#nextLabel').text('Следующий звонок: ' + (nextCall || '--:--'));
+}
+
+function normalizePhone(phone) {
+    if (!phone) return phone;
+    var digits = phone.replace(/\D/g, '');
+    if (digits.length === 10) {
+        digits = '8' + digits;
+    } else if (digits.length === 11 && digits[0] === '7') {
+        digits = '8' + digits.slice(1);
+    } else if (digits.length === 11 && digits[0] === '8') {
+        // уже в нужном формате
+    } else {
+        return null;
+    }
+    return digits;
+}
+
+$(document).on('blur', '#callPhone, #editPhoneText', function() {
+    var normalized = normalizePhone($(this).val());
+    if (normalized) $(this).val(normalized);
+});
+
+function loadDateFilterOptions() {
+    $.get('/api/calls/', function(data) {
+        var dates = new Set();
+        data.calls.forEach(function(c) {
+            var date = c.next_attempt.substring(0,10);
+            dates.add(date);
+        });
+        var select = $('#dateFilter');
+        select.empty();
+        select.append('<option value="">Все записи</option>');
+        
+        var today = new Date();
+        var todayStr = today.getFullYear() + '-' + 
+                       String(today.getMonth() + 1).padStart(2, '0') + '-' + 
+                       String(today.getDate()).padStart(2, '0');
+        
+        Array.from(dates).sort().reverse().forEach(function(d) {
+            var optionText = (d === todayStr) ? '📅 сегодня' : d;
+            select.append('<option value="' + d + '">' + optionText + '</option>');
+        });
+        
+        setDefaultDateFilter();
+    });
+}
+
+function setDefaultDateFilter() {
+    var today = new Date();
+    var year = today.getFullYear();
+    var month = String(today.getMonth() + 1).padStart(2, '0');
+    var day = String(today.getDate()).padStart(2, '0');
+    var todayStr = year + '-' + month + '-' + day;
+    
+    var select = $('#dateFilter');
+    if (select.find('option[value="' + todayStr + '"]').length > 0) {
+        select.val(todayStr);
+    } else {
+        select.val('');
+    }
+    loadCalls();
+}
+
+function resetDateFilter() {
+    $('#dateFilter').val('');
+    loadCalls();
+}
+
+function loadCalls() {
+    var filterDate = $('#dateFilter').val();
+    $.get('/api/calls/', {date: filterDate}, function(data) {
+        var tbody = $('#callsTableBody');
+        tbody.empty();
+        if (data.calls.length === 0) {
+            tbody.append('<tr><td colspan="11" class="text-center">Нет записей</td></tr>');
+        } else {
+            data.calls.forEach(function(c) {
+                var rowClass = '';
+                if (c.call_type === 'Недозвон') rowClass = 'call-type-nedozvon';
+                else if (c.call_type === 'Перезвон') rowClass = 'call-type-perezvon';
+                else if (c.call_type === 'Отслеживание') rowClass = 'call-type-tracking';
+                
+                var statusBadge = '';
+                if (c.notification_status === 'Просрочено') statusBadge = '<span class="badge bg-danger">Просрочено</span>';
+                else if (c.notification_status === 'Скоро') statusBadge = '<span class="badge bg-warning text-dark">Скоро</span>';
+                else if (c.notification_status === 'Близко') statusBadge = '<span class="badge bg-info">Близко</span>';
+                else statusBadge = '<span class="badge bg-secondary">Запланиран</span>';
+                
+                var row = '<tr class="' + rowClass + '">';
+                row += '<td><input type="checkbox" class="call-checkbox" value="' + c.id + '"></td>';
+                row += '<td>' + c.id + '</td>';
+                row += '<td>' + escapeHtml(c.comment) + '</td>';
+                
+                row += '<td>';
+                row += '<div class="d-flex align-items-center gap-2">';
+                row += '<button class="btn btn-sm btn-outline-primary rounded-circle" style="width:32px; height:32px;" onclick="window.callUIS(\'' + c.phone + '\')" title="Позвонить через UIS">📞</button>';
+                row += '<span style="cursor: pointer;" onclick="window.copyPhoneNumber(\'' + c.phone + '\', \'table\'); event.stopPropagation();" title="Клик — копировать номер">' + escapeHtml(c.phone) + '</span>';
+                row += '</div>';
+                row += '</td>';
+                
+                row += '<td>' + c.first_attempt + '</td>';
+                row += '<td>' + c.next_attempt + '</td>';
+                row += '<td>' + c.attempt_number + '</td>';
+                row += '<td>' + c.time_until + '</td>';
+                row += '<td>' + statusBadge + '</td>';
+                row += '<td>' + c.call_type + '</td>';
+                
+                row += '<td>';
+                row += '<div class="d-flex gap-1 justify-content-center">';
+                row += '<button class="btn btn-sm btn-outline-primary rounded-circle" style="width:32px; height:32px;" onclick="openEditCommentModal(' + c.id + ', \'' + escapeJsString(c.comment) + '\')" title="Изменить комментарий">✏️</button>';
+                row += '<button class="btn btn-sm btn-outline-success rounded-circle" style="width:32px; height:32px;" onclick="openEditPhoneModal(' + c.id + ', \'' + escapeJsString(c.phone) + '\')" title="Изменить телефон">📞</button>';
+                row += '<button class="btn btn-sm btn-outline-warning rounded-circle" style="width:32px; height:32px;" onclick="openAdjustTimeModal(' + c.id + ', \'' + c.next_attempt + '\')" title="Изменить время">⏰</button>';
+                row += '</div>';
+                row += '</td>';
+                
+                row += '</tr>';
+                tbody.append(row);
+            });
+        }
+        updateStats(data.calls);
+    });
+}
+
+function escapeJsString(str) {
+    return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+function updateStats(calls) {
+    var total = calls.length;
+    var overdue = 0;
+    var nextCall = null;
+    var nextTime = null;
+    calls.forEach(function(c) {
+        if (c.notification_status === 'Просрочено') overdue++;
+        var dt = new Date(c.next_attempt.replace(' ', 'T'));
+        if (dt > new Date()) {
+            if (!nextTime || dt < nextTime) {
+                nextTime = dt;
+                nextCall = c.next_attempt;
+            }
+        }
+    });
+    $('#totalLabel').text('Всего: ' + total);
+    $('#overdueLabel').text('Просрочено: ' + overdue);
+    $('#nextLabel').text('Следующий звонок: ' + (nextCall || '--:--'));
+}
+
+function setupEventListeners() {
+    $('#callForm').off('submit').on('submit', function(e) {
+        e.preventDefault();
+        addCall();
+    });
+    
+    $('#callTypeSelect').off('change').on('change', function() {
+        if ($(this).val() === 'Недозвон') {
+            $('#callNextAttempt').prop('disabled', true).val('');
+        } else {
+            $('#callNextAttempt').prop('disabled', false);
+            var now = new Date();
+            now.setHours(now.getHours() + 1);
+            $('#callNextAttempt').val(now.toISOString().slice(0,16));
+        }
+    }).trigger('change');
+    
+    $('#selectAll').off('change').on('change', function() {
+        $('.call-checkbox').prop('checked', $(this).prop('checked'));
+    });
+    
+    $('#dateFilter').off('change').on('change', function() {
+        loadCalls();
+    });
+}
+
+function addCall() {
+    var comment = $('#callComment').val().trim();
+    var phone = normalizePhone($('#callPhone').val().trim());
+    $('#callPhone').val(phone);
+    var callType = $('#callTypeSelect').val();
+    var nextAttempt = $('#callNextAttempt').val();
+    
+    if (!comment || !phone) {
+        alert('Заполните комментарий и телефон');
+        return;
+    }
+    
+    if (!/^8\d{10}$/.test(phone)) {
+        alert('Телефон должен быть в формате 8XXXXXXXXXX (11 цифр)');
+        return;
+    }
+    
+    var data = {
+        comment: comment,
+        phone: phone,
+        call_type: callType,
+        next_attempt: nextAttempt
+    };
+    
+    $.post('/api/calls/add/', data)
+        .done(function() {
+            clearCallForm();
+            loadCalls();
+            loadDateFilterOptions();
+        })
+        .fail(function(xhr) {
+            alert('Ошибка: ' + xhr.responseText);
+        });
+}
+
+function clearCallForm() {
+    $('#callComment').val('');
+    $('#callPhone').val('');
+    $('#callTypeSelect').val('Недозвон').trigger('change');
+}
+
+function addAttempt() {
+    var ids = getSelectedIds('.call-checkbox');
+    if (ids.length === 0) {
+        alert('Выберите записи');
+        return;
+    }
+    var promises = ids.map(function(id) {
+        return $.post('/api/calls/update/', {id: id});
+    });
+    Promise.all(promises).then(function() {
+        loadCalls();
+    }).catch(function() {
+        alert('Ошибка при добавлении попытки');
+    });
+}
+
+function deleteSelected() {
+    var ids = getSelectedIds('.call-checkbox');
+    if (ids.length === 0) {
+        alert('Выберите записи');
+        return;
+    }
+    if (!confirm('Удалить выбранные записи?')) return;
+    $.post('/api/calls/delete/', {ids: ids})
+        .done(function() {
+            loadCalls();
+            loadDateFilterOptions();
+        });
+}
+
+function copyPhone() {
+    var ids = getSelectedIds('.call-checkbox');
+    if (ids.length === 0) return;
+    var phones = [];
+    $('#callsTableBody tr').each(function() {
+        var cb = $(this).find('.call-checkbox');
+        if (cb.is(':checked')) {
+            phones.push($(this).find('td:eq(3) span').text());
+        }
+    });
+    navigator.clipboard.writeText(phones.join('\n')).then(function() {
+        alert('Скопировано ' + phones.length + ' номеров');
+    });
+}
+
+function copyComment() {
+    var ids = getSelectedIds('.call-checkbox');
+    if (ids.length === 0) return;
+    var comments = [];
+    $('#callsTableBody tr').each(function() {
+        var cb = $(this).find('.call-checkbox');
+        if (cb.is(':checked')) {
+            comments.push($(this).find('td:eq(2)').text());
+        }
+    });
+    navigator.clipboard.writeText(comments.join('\n')).then(function() {
+        alert('Скопировано ' + comments.length + ' комментариев');
+    });
+}
+
+function openAdjustTimeModal(callId, currentNextAttempt) {
+    $('#adjustCallId').val(callId);
+    var datetimeLocal = currentNextAttempt.replace(' ', 'T');
+    $('#adjustNextAttempt').val(datetimeLocal);
+    new bootstrap.Modal(document.getElementById('adjustTimeModal')).show();
+}
+
+function saveAdjustedTime() {
+    var callId = $('#adjustCallId').val();
+    var newTime = $('#adjustNextAttempt').val();
+    if (!newTime) {
+        alert('Выберите дату и время');
+        return;
+    }
+    $.post('/api/calls/adjust/', {
+        id: callId,
+        next_attempt: newTime
+    }).done(function() {
+        bootstrap.Modal.getInstance(document.getElementById('adjustTimeModal')).hide();
+        loadCalls();
+    }).fail(function(xhr) {
+        alert('Ошибка: ' + xhr.responseText);
+    });
+}
+
+function openEditCommentModal(callId, currentComment) {
+    $('#editCommentCallId').val(callId);
+    $('#editCommentText').val(currentComment);
+    new bootstrap.Modal(document.getElementById('editCommentModal')).show();
+}
+
+function saveComment() {
+    var callId = $('#editCommentCallId').val();
+    var comment = $('#editCommentText').val().trim();
+    if (!comment) {
+        alert('Комментарий не может быть пустым');
+        return;
+    }
+    $.post('/api/calls/update_comment/', {
+        id: callId,
+        comment: comment
+    }).done(function() {
+        bootstrap.Modal.getInstance(document.getElementById('editCommentModal')).hide();
+        loadCalls();
+    }).fail(function(xhr) {
+        alert('Ошибка: ' + xhr.responseText);
+    });
+}
+
+function openEditPhoneModal(callId, currentPhone) {
+    $('#editPhoneCallId').val(callId);
+    $('#editPhoneText').val(currentPhone);
+    new bootstrap.Modal(document.getElementById('editPhoneModal')).show();
+}
+
+function savePhone() {
+    var callId = $('#editPhoneCallId').val();
+    var phone = $('#editPhoneText').val().trim();
+    phone = normalizePhone(phone);
+    if (!phone) {
+        alert('Неверный формат телефона');
+        return;
+    }
+    if (!/^8\d{10}$/.test(phone)) {
+        alert('Телефон должен быть в формате 8XXXXXXXXXX (11 цифр)');
+        return;
+    }
+    $.post('/api/calls/update_phone/', {
+        id: callId,
+        phone: phone
+    }).done(function() {
+        bootstrap.Modal.getInstance(document.getElementById('editPhoneModal')).hide();
+        loadCalls();
+    }).fail(function(xhr) {
+        alert('Ошибка: ' + xhr.responseText);
+    });
+}
+
+function getSelectedIds(checkboxClass) {
+    var ids = [];
+    $(checkboxClass + ':checked').each(function() {
+        ids.push($(this).val());
+    });
+    return ids;
+}
+
+function escapeHtml(text) {
+    var map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+}
+
+window.addEventListener('beforeunload', function() {
+    if (timeUpdateInterval) clearInterval(timeUpdateInterval);
+});
+</script>

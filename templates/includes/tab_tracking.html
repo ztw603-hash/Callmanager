@@ -1,0 +1,239 @@
+{% load static %}
+<div class="tab-pane active">
+    <h2 class="mb-4">🔍 Отслеживание заявок</h2>
+
+    <!-- Форма добавления заявки -->
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white">➕ Новая заявка</div>
+        <div class="card-body">
+            <form id="trackingForm">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label>Заявка</label>
+                            <input type="text" class="form-control" id="claimInput" placeholder="Например: ООО Ромашка" required>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label>Телефон</label>
+                            <input type="text" class="form-control" id="phoneInput" placeholder="8XXXXXXXXXX" required>
+                            <small class="form-text text-muted">Формат: 8XXXXXXXXXX</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label>Номер СРМ</label>
+                            <input type="text" class="form-control" id="crmInput" placeholder="CRM-12345" required>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label>Дата и время подключения</label>
+                            <input type="datetime-local" class="form-control" id="connectionDatetime" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-success">➕ Добавить</button>
+                        <button type="button" class="btn btn-secondary" onclick="clearTrackingForm()">Очистить</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Таблица заявок -->
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover" id="trackingTable">
+            <thead class="table-light">
+                <tr>
+                    <th><input type="checkbox" id="selectAllTracking"></th>
+                    <th>ID</th>
+                    <th>Заявка</th>
+                    <th>Телефон</th>
+                    <th>Номер СРМ</th>
+                    <th>Дата/время подключения</th>
+                    <th>ID звонка</th>
+                    <th>Статус</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody id="trackingTableBody">
+                <tr><td colspan="9" class="text-center">Загрузка...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="mt-3">
+        <button class="btn btn-danger" onclick="deleteSelectedTracking()">🗑 Удалить выбранные</button>
+    </div>
+</div>
+
+<script>
+// Инициализация вкладки
+window.init_tracking = function() {
+    loadTracking();
+    setupTrackingForm();
+    var now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    $('#connectionDatetime').val(now.toISOString().slice(0,16));
+};
+
+function normalizePhone(phone) {
+    if (!phone) return phone;
+    var digits = phone.replace(/\D/g, '');
+    if (digits.length === 10) {
+        digits = '8' + digits;
+    } else if (digits.length === 11 && digits[0] === '7') {
+        digits = '8' + digits.slice(1);
+    } else if (digits.length === 11 && digits[0] === '8') {
+        // уже в нужном формате
+    } else {
+        return null;
+    }
+    return digits;
+}
+
+$(document).on('blur', '#phoneInput', function() {
+    var normalized = normalizePhone($(this).val());
+    if (normalized) $(this).val(normalized);
+});
+
+function loadTracking() {
+    $.get('/api/tracking/')
+        .done(function(data) {
+            var tbody = $('#trackingTableBody');
+            tbody.empty();
+            if (data.tracking.length === 0) {
+                tbody.append('<tr><td colspan="9" class="text-center">Нет заявок</td></tr>');
+            } else {
+                data.tracking.forEach(function(t) {
+                    var statusBadge = '';
+                    if (t.completed) {
+                        statusBadge = '<span class="badge bg-success">Выполнена</span>';
+                    } else {
+                        statusBadge = '<span class="badge bg-primary">Активна</span>';
+                    }
+                    var row = '<tr>';
+                    row += '<td><input type="checkbox" class="tracking-checkbox" value="' + t.tracking_id + '"></td>';
+                    row += '<td>' + t.tracking_id + '</td>';
+                    row += '<td>' + escapeHtml(t.claim) + '</td>';
+                    row += '<td>' + escapeHtml(t.phone) + '</td>';
+                    row += '<td>' + escapeHtml(t.crm) + '</td>';
+                    row += '<td>' + t.connection_datetime + '</td>';
+                    row += '<td><a href="#" onclick="jumpToCall(' + t.call_record_id + ')">' + (t.call_record_id || '-') + '</a></td>';
+                    row += '<td>' + statusBadge + '</td>';
+                    row += '<td><button class="btn btn-sm btn-danger" onclick="deleteTracking(' + t.tracking_id + ')">×</button></td>';
+                    row += '</tr>';
+                    tbody.append(row);
+                });
+            }
+        });
+}
+
+function setupTrackingForm() {
+    $('#trackingForm').off('submit').on('submit', function(e) {
+        e.preventDefault();
+        addTracking();
+    });
+}
+
+function addTracking() {
+    var claim = $('#claimInput').val().trim();
+    var phone = normalizePhone($('#phoneInput').val().trim());
+    var crm = $('#crmInput').val().trim();
+    var connDt = $('#connectionDatetime').val();
+    
+    if (!claim || !phone || !crm || !connDt) {
+        alert('Заполните все поля');
+        return;
+    }
+    
+    if (!/^8\d{10}$/.test(phone)) {
+        alert('Телефон должен быть в формате 8XXXXXXXXXX (11 цифр)');
+        return;
+    }
+    
+    $.post('/api/tracking/add/', {
+        claim: claim,
+        phone: phone,
+        crm: crm,
+        connection_datetime: connDt
+    })
+    .done(function() {
+        clearTrackingForm();
+        loadTracking();
+        if (typeof loadCalls === 'function') loadCalls();
+    })
+    .fail(function(xhr) {
+        alert('❌ Ошибка: ' + xhr.responseText);
+    });
+}
+
+function clearTrackingForm() {
+    $('#claimInput').val('');
+    $('#phoneInput').val('');
+    $('#crmInput').val('');
+    var now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    $('#connectionDatetime').val(now.toISOString().slice(0,16));
+}
+
+function deleteSelectedTracking() {
+    var ids = [];
+    $('.tracking-checkbox:checked').each(function() {
+        ids.push($(this).val());
+    });
+    if (ids.length === 0) {
+        alert('Выберите заявки');
+        return;
+    }
+    if (!confirm('Удалить выбранные заявки? Связанные звонки также будут удалены.')) return;
+    $.post('/api/tracking/delete/', {ids: ids})
+        .done(function() {
+            loadTracking();
+            if (typeof loadCalls === 'function') loadCalls();
+        });
+}
+
+function deleteTracking(id) {
+    if (confirm('Удалить заявку?')) {
+        $.post('/api/tracking/delete/', {ids: [id]})
+            .done(function() {
+                loadTracking();
+                if (typeof loadCalls === 'function') loadCalls();
+            });
+    }
+}
+
+function jumpToCall(callId) {
+    if (!callId) return;
+    loadTab('calls');
+    setTimeout(function() {
+        $('#callsTableBody tr').each(function() {
+            var idCell = $(this).find('td:eq(1)');
+            if (idCell.text() == callId) {
+                $(this).addClass('table-primary');
+                $(this)[0].scrollIntoView({behavior: 'smooth', block: 'center'});
+            }
+        });
+    }, 500);
+}
+
+$('#selectAllTracking').off('change').on('change', function() {
+    $('.tracking-checkbox').prop('checked', $(this).prop('checked'));
+});
+
+function escapeHtml(text) {
+    var map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+}
+</script>
